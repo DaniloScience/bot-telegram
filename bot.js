@@ -100,7 +100,6 @@ async function gerarResposta(prompt, systemPrompt) {
         );
 
         if (!response.data || !response.data[0]) {
-            console.log("Resposta inválida:", response.data);
             return "❌ Erro na IA.";
         }
 
