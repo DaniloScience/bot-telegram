@@ -2,9 +2,13 @@ const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 
 const token = process.env.TOKEN;
-const API_KEY = process.env.API_KEY;
+const HF_TOKEN = process.env.HF_TOKEN;
 
 const bot = new TelegramBot(token, { polling: true });
+
+// ======================
+// CONFIG
+// ======================
 
 let vipUsers = [6248743831];
 let users = {};
@@ -14,34 +18,29 @@ function getToday() {
 }
 
 // ======================
-// IA CORRIGIDA
+// IA (HUGGING FACE)
 // ======================
 
 async function gerarResposta(prompt, systemPrompt) {
     try {
         const response = await axios.post(
-            'https://openrouter.ai/api/v1/chat/completions',
+            "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2",
             {
-                model: "openai/gpt-3.5-turbo",
-                messages: [
-                    { role: "system", content: systemPrompt },
-                    { role: "user", content: prompt }
-                ]
+                inputs: `${systemPrompt}\n\nPergunta: ${prompt}\nResposta:`
             },
             {
                 headers: {
-                    "Authorization": `Bearer ${API_KEY}`,
-                    "Content-Type": "application/json"
+                    Authorization: `Bearer ${HF_TOKEN}`
                 }
             }
         );
 
-        if (!response.data.choices) {
+        if (!response.data || !response.data[0]) {
             console.log("Resposta inválida:", response.data);
-            return "❌ Erro na resposta da IA.";
+            return "❌ Erro na IA.";
         }
 
-        return response.data.choices[0].message.content;
+        return response.data[0].generated_text;
 
     } catch (error) {
         console.log("ERRO IA:", error.response?.data || error.message);
@@ -60,6 +59,8 @@ bot.on('message', async (msg) => {
 
     if (!text) return;
 
+    // COMANDOS
+
     if (text === "/meuid") {
         return bot.sendMessage(chatId, `🆔 Seu ID: ${userId}`);
     }
@@ -76,7 +77,8 @@ bot.on('message', async (msg) => {
         return responderIA(msg, "Resuma o texto de forma simples e direta.");
     }
 
-    return responderIA(msg, "Você é um assistente inteligente.");
+    // mensagem normal
+    return responderIA(msg, "Você é um assistente inteligente que ajuda com renda, vendas e dúvidas.");
 });
 
 // ======================
@@ -102,14 +104,16 @@ async function responderIA(msg, systemPrompt) {
     const isVIP = vipUsers.includes(userId);
 
     if (!isVIP && users[userId].count >= 2) {
-        return bot.sendMessage(chatId,
-            "🚫 Limite atingido.\n💎 VIP: @Suporte_Assistente");
+        return bot.sendMessage(
+            chatId,
+            "🚫 Limite atingido.\n💎 Quer VIP? Fala comigo: @Suporte_Assistente"
+        );
     }
 
     if (!isVIP) users[userId].count++;
 
     try {
-        bot.sendMessage(chatId, "🤖 Pensando...");
+        await bot.sendMessage(chatId, "🤖 Pensando...");
 
         const resposta = await gerarResposta(text, systemPrompt);
 
