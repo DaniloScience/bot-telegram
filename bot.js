@@ -85,49 +85,51 @@ bot.on('message', async (msg) => {
 // FUNÇÃO PRINCIPAL
 // ======================
 
-async function responderIA(msg, systemPrompt) {
-    const chatId = msg.chat.id;
-    const userId = msg.from.id;
-    const text = msg.text;
-
-    const today = getToday();
-
-    if (!users[userId]) {
-        users[userId] = { count: 0, lastDate: today };
-    }
-
-    if (users[userId].lastDate !== today) {
-        users[userId].count = 0;
-        users[userId].lastDate = today;
-    }
-
-    const isVIP = vipUsers.includes(userId);
-
-    if (!isVIP && users[userId].count >= 2) {
-        return bot.sendMessage(
-            chatId,
-            "🚫 Limite atingido.\n💎 Quer VIP? Fala comigo: @Suporte_Assistente"
-        );
-    }
-
-    if (!isVIP) users[userId].count++;
-
+async function gerarResposta(prompt, systemPrompt) {
     try {
-        await bot.sendMessage(chatId, "🤖 Pensando...");
+        const response = await axios.post(
+            "https://router.huggingface.co/hf-inference/models/mistralai/Mistral-7B-Instruct-v0.2",
+            {
+                inputs: `${systemPrompt}\n\nPergunta: ${prompt}\nResposta:`
+            },
+            {
+                headers: {
+                    Authorization: `Bearer ${process.env.HF_TOKEN}`
+                }
+            }
+        );
 
-        const resposta = await gerarResposta(text, systemPrompt);
+        if (!response.data || !response.data[0]) {
+            console.log("Resposta inválida:", response.data);
+            return "❌ Erro na IA.";
+        }
 
-        await bot.sendMessage(chatId, resposta);
+        return response.data[0].generated_text;
 
     } catch (error) {
-        console.log(error);
-        bot.sendMessage(chatId, "❌ Erro geral.");
+        console.log("ERRO IA:", error.response?.data || error.message);
+        return "❌ Erro ao gerar resposta.";
     }
+}
 
-    if (!isVIP) {
-        const restantes = 2 - users[userId].count;
-        bot.sendMessage(chatId, `⚡ Restam ${restantes} uso(s)`);
-    } else {
-        bot.sendMessage(chatId, "💎 VIP ativo");
-    }
+if (!isVIP) users[userId].count++;
+
+try {
+    await bot.sendMessage(chatId, "🤖 Pensando...");
+
+    const resposta = await gerarResposta(text, systemPrompt);
+
+    await bot.sendMessage(chatId, resposta);
+
+} catch (error) {
+    console.log(error);
+    bot.sendMessage(chatId, "❌ Erro geral.");
+}
+
+if (!isVIP) {
+    const restantes = 2 - users[userId].count;
+    bot.sendMessage(chatId, `⚡ Restam ${restantes} uso(s)`);
+} else {
+    bot.sendMessage(chatId, "💎 VIP ativo");
+}
 }
