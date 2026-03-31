@@ -1,30 +1,10 @@
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 
-console.log("🚀 Bot iniciando...");
-
-// ======================
-// ENV
-// ======================
-
 const token = process.env.TOKEN;
 const API_KEY = process.env.API_KEY;
 
-if (!token) {
-    console.log("❌ TOKEN não definido!");
-    process.exit(1);
-}
-
-if (!API_KEY) {
-    console.log("❌ API_KEY não definida!");
-    process.exit(1);
-}
-
 const bot = new TelegramBot(token, { polling: true });
-
-// ======================
-// CONFIG
-// ======================
 
 let vipUsers = [6248743831];
 let users = {};
@@ -34,7 +14,7 @@ function getToday() {
 }
 
 // ======================
-// FUNÇÃO IA
+// IA CORRIGIDA
 // ======================
 
 async function gerarResposta(prompt, systemPrompt) {
@@ -56,11 +36,16 @@ async function gerarResposta(prompt, systemPrompt) {
             }
         );
 
+        if (!response.data.choices) {
+            console.log("Resposta inválida:", response.data);
+            return "❌ Erro na resposta da IA.";
+        }
+
         return response.data.choices[0].message.content;
 
     } catch (error) {
-        console.log("❌ ERRO IA:", error.response?.data || error.message);
-        return "❌ Erro ao gerar resposta da IA.";
+        console.log("ERRO IA:", error.response?.data || error.message);
+        return "❌ Erro ao gerar resposta.";
     }
 }
 
@@ -74,15 +59,6 @@ bot.on('message', async (msg) => {
     const text = msg.text;
 
     if (!text) return;
-
-    // ======================
-    // COMANDOS
-    // ======================
-
-    if (text === "/start") {
-        return bot.sendMessage(chatId,
-            "🚀 Bem-vindo!\n\nUse:\n/renda\n/texto\n/resumo\n\nOu mande qualquer mensagem 😎");
-    }
 
     if (text === "/meuid") {
         return bot.sendMessage(chatId, `🆔 Seu ID: ${userId}`);
@@ -100,8 +76,7 @@ bot.on('message', async (msg) => {
         return responderIA(msg, "Resuma o texto de forma simples e direta.");
     }
 
-    // mensagem normal
-    return responderIA(msg, "Você é um assistente inteligente que ajuda com tarefas, renda, textos e dúvidas.");
+    return responderIA(msg, "Você é um assistente inteligente.");
 });
 
 // ======================
@@ -126,31 +101,29 @@ async function responderIA(msg, systemPrompt) {
 
     const isVIP = vipUsers.includes(userId);
 
-    if (!isVIP) {
-        if (users[userId].count >= 2) {
-            return bot.sendMessage(chatId,
-                "🚫 Limite atingido.\n💎 Quer VIP? Fala comigo: @Suporte_Assistente");
-        }
-
-        users[userId].count++;
+    if (!isVIP && users[userId].count >= 2) {
+        return bot.sendMessage(chatId,
+            "🚫 Limite atingido.\n💎 VIP: @Suporte_Assistente");
     }
 
+    if (!isVIP) users[userId].count++;
+
     try {
-        await bot.sendMessage(chatId, "🤖 Pensando...");
+        bot.sendMessage(chatId, "🤖 Pensando...");
 
         const resposta = await gerarResposta(text, systemPrompt);
 
         await bot.sendMessage(chatId, resposta);
 
     } catch (error) {
-        console.log("❌ ERRO GERAL:", error.message);
-        await bot.sendMessage(chatId, "❌ Erro geral.");
+        console.log(error);
+        bot.sendMessage(chatId, "❌ Erro geral.");
     }
 
     if (!isVIP) {
         const restantes = 2 - users[userId].count;
-        await bot.sendMessage(chatId, `⚡ Restam ${restantes} uso(s)`);
+        bot.sendMessage(chatId, `⚡ Restam ${restantes} uso(s)`);
     } else {
-        await bot.sendMessage(chatId, "💎 VIP ativo");
+        bot.sendMessage(chatId, "💎 VIP ativo");
     }
 }
