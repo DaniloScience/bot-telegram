@@ -1,8 +1,24 @@
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 
+console.log("🚀 Bot iniciando...");
+
+// ======================
+// ENV
+// ======================
+
 const token = process.env.TOKEN;
 const API_KEY = process.env.API_KEY;
+
+if (!token) {
+    console.log("❌ TOKEN não definido!");
+    process.exit(1);
+}
+
+if (!API_KEY) {
+    console.log("❌ API_KEY não definida!");
+    process.exit(1);
+}
 
 const bot = new TelegramBot(token, { polling: true });
 
@@ -22,24 +38,30 @@ function getToday() {
 // ======================
 
 async function gerarResposta(prompt, systemPrompt) {
-    const response = await axios.post(
-        'https://openrouter.ai/api/v1/chat/completions',
-        {
-            model: "openai/gpt-3.5-turbo",
-            messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: prompt }
-            ]
-        },
-        {
-            headers: {
-                "Authorization": `Bearer ${API_KEY}`,
-                "Content-Type": "application/json"
+    try {
+        const response = await axios.post(
+            'https://openrouter.ai/api/v1/chat/completions',
+            {
+                model: "openai/gpt-3.5-turbo",
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: prompt }
+                ]
+            },
+            {
+                headers: {
+                    "Authorization": `Bearer ${API_KEY}`,
+                    "Content-Type": "application/json"
+                }
             }
-        }
-    );
+        );
 
-    return response.data.choices[0].message.content;
+        return response.data.choices[0].message.content;
+
+    } catch (error) {
+        console.log("❌ ERRO IA:", error.response?.data || error.message);
+        return "❌ Erro ao gerar resposta da IA.";
+    }
 }
 
 // ======================
@@ -56,6 +78,11 @@ bot.on('message', async (msg) => {
     // ======================
     // COMANDOS
     // ======================
+
+    if (text === "/start") {
+        return bot.sendMessage(chatId,
+            "🚀 Bem-vindo!\n\nUse:\n/renda\n/texto\n/resumo\n\nOu mande qualquer mensagem 😎");
+    }
 
     if (text === "/meuid") {
         return bot.sendMessage(chatId, `🆔 Seu ID: ${userId}`);
@@ -109,21 +136,21 @@ async function responderIA(msg, systemPrompt) {
     }
 
     try {
-        bot.sendMessage(chatId, "🤖 Pensando...");
+        await bot.sendMessage(chatId, "🤖 Pensando...");
 
         const resposta = await gerarResposta(text, systemPrompt);
 
-        bot.sendMessage(chatId, resposta);
+        await bot.sendMessage(chatId, resposta);
 
     } catch (error) {
-        console.log(error.response?.data || error.message);
-        bot.sendMessage(chatId, "❌ Erro na IA.");
+        console.log("❌ ERRO GERAL:", error.message);
+        await bot.sendMessage(chatId, "❌ Erro geral.");
     }
 
     if (!isVIP) {
         const restantes = 2 - users[userId].count;
-        bot.sendMessage(chatId, `⚡ Restam ${restantes} uso(s)`);
+        await bot.sendMessage(chatId, `⚡ Restam ${restantes} uso(s)`);
     } else {
-        bot.sendMessage(chatId, "💎 VIP ativo");
+        await bot.sendMessage(chatId, "💎 VIP ativo");
     }
 }
